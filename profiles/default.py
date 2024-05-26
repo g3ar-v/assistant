@@ -4,9 +4,6 @@ from interpreter import interpreter
 # This is an Open Interpreter compatible profile.
 # Visit https://01.openinterpreter.com/profile for all options.
 
-os.environ["TOGETHERAI_API_KEY"] = (
-    "e53a18371b4e22c950a3dc816104eb11990490adbbc4c02adf4ee8f4fc702385"
-)
 # Connect your 01 to a language model
 interpreter.llm.model = "gpt-4o"
 # interpreter.llm.model = "together_ai/meta-llama/Llama-3-70b-chat-hf"
