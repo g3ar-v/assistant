@@ -9,8 +9,12 @@ LOG.level parameter.
 """
 
 import inspect
-import sys
+import queue
 import logging
+import os
+import sys
+import core
+from logging import DEBUG, INFO
 
 
 def _make_log_method(fn):
@@ -51,22 +55,28 @@ class LOG:
         """Initializes the class, sets the default log level and creates
         the required handlers.
         """
+        app_config = core.Configuration.get()
         log_message_format = (
-            "{asctime} | {levelname:8} | {name} | {message} | {process:5} |"
+            "{asctime} |  {process:5} | {levelname:8} | {name} | {message} "
         )
 
         formatter = logging.Formatter(log_message_format, style="{")
         formatter.default_msec_format = "%s.%03d"
-        cls.handler = logging.StreamHandler(sys.stdout)
+
+        if app_config.get("log_dir"):
+            if not os.path.exists(app_config.get("log_dir")):
+                os.makedirs(app_config.get("log_dir"))
+            log_file_path = os.path.join(app_config.get("log_dir"), "dev.log")
+            cls.handler = logging.FileHandler(log_file_path)
+        else:
+            cls.handler = logging.FileHandler("dev.log")
+
+        if app_config.get("log_format"):
+            formatter = logging.Formatter(app_config.get("log_format"), style="{")
+            cls.handler.setFormatter(formatter)
+
         cls.handler.setFormatter(formatter)
-
-        # TODO: fix this
-        # config = vasco.configuration.Configuration.get()
-        # if config.get("log_format"):
-        #     formatter = logging.Formatter(config.get("log_format"), style="{")
-        #     cls.handler.setFormatter(formatter)
-
-        # cls.level = logging.getLevelName(config.get("log_level", "INFO"))
+        cls.level = logging.getLevelName(app_config.get("log_level", "INFO"))
 
         # Enable logging in external modules
         cls.create_logger("").setLevel(cls.level)

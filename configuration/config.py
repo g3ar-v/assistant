@@ -1,11 +1,14 @@
 import json
 import os
+from os.path import dirname, exists, isfile, join
+
 import xdg.BaseDirectory
-
 from xdg.BaseDirectory import xdg_config_home
-from os.path import exists, isfile, dirname, join
-from utils import ComboLock, get_temp_path, LOG, load_commented_json, merge_dict
 
+from core.util.combo_lock import ComboLock
+from core.util.file_utils import get_temp_path
+from core.util.json_helper import load_commented_json, merge_dict
+from core.util.log import LOG
 
 DEFAULT_CONFIG = join(dirname(__file__), "device.conf")
 USER_CONFIG = join(xdg_config_home, "vasco", "device.conf")

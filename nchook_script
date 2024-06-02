@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# echo "app: $1 title: $2 body: $3 timestamp: $4" | nc localhost 8000
+/usr/bin/curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"AUTOMATED MESSAGE FROM EVENT SCHEDULER and application $1: $2\"}" http://localhost:8008/
+

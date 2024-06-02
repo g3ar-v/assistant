@@ -1,0 +1,32 @@
+#!/bin/bash
+_opt=$1
+CONDA_ENV_NAME=assistant
+PROJECT_DIR=/Users/tesla/Projects/assistant
+
+function found_exe() {
+	hash "$1" 2>/dev/null
+}
+
+# If tput is available and can handle multiple colors
+if found_exe tput; then
+	if [[ $(tput colors) != "-1" && -z $CI ]]; then
+		GREEN=$(tput setaf 2)
+		BLUE=$(tput setaf 4)
+		CYAN=$(tput setaf 6)
+		YELLOW=$(tput setaf 3)
+		RED=$(tput setaf 1)
+		RESET=$(tput sgr0)
+		HIGHLIGHT=$YELLOW
+	fi
+fi
+
+eval "$(conda shell.bash hook)"
+conda activate $CONDA_ENV_NAME
+
+if [ "${_opt}" = "dev" ]; then
+	echo "$CYAN running in dev mode... $RESET"
+	cd $PROJECT_DIR || exit
+	find . -type f -name "*.py" | entr -cr python server.py
+else
+	python server.py
+fi

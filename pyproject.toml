@@ -1,5 +1,7 @@
 [tool.poetry]
 name = "assistant"
+packages = [{ include = "core" }]
+include = ["start.py"]
 version = "0.1.0"
 description = ""
 authors = ["victor <vfranktor@gmail.com>"]
@@ -8,14 +10,24 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.11, <3.12"
 realtimestt = { path = "../RealtimeSTT", develop = true }
+# realtimestt = "^0.1.12"
 realtimetts = "^0.3.44"
 fasteners = "^0.19"
 pyxdg = "^0.28"
-open-interpreter = "^0.2.5"
+# open-interpreter = "^0.2.5"
+open-interpreter = { path = "../open-interpreter", develop = true }
 litellm = "1.35.38"
 pynput = "^1.7.6"
+apsw = "^3.46.0.0"
+watchdog = "^4.0.1"
+pathlib = "^1.0.1"
+rich = "^13.7.1"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
