@@ -28,5 +28,6 @@ if [ "${_opt}" = "dev" ]; then
 	cd $PROJECT_DIR || exit
 	find . -type f -name "*.py" | entr -cr python server.py
 else
+	cd $PROJECT_DIR || exit
 	python server.py
 fi
