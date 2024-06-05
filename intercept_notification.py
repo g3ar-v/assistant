@@ -7,8 +7,7 @@ import apsw
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.kqueue import KqueueObserver
 
-from core.util.log import LOG
-from core.util.process_utils import create_daemon
+from core import LOG
 
 
 class DBEventHandler(FileSystemEventHandler):
@@ -147,10 +146,10 @@ def start_notification_observer():
     observer = KqueueObserver()
     observer.schedule(event_handler, watch_file)
     # observer.daemon = True
+    LOG.info("Starting notification observer...")
     observer.start()
 
     # observer_thread = create_daemon(target=observer.join())
-    LOG.info("started notification observer")
     # print("started notification observer")
     # return observer_thread, observer
     return observer
