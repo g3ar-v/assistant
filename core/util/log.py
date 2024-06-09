@@ -9,12 +9,9 @@ LOG.level parameter.
 """
 
 import inspect
-import queue
 import logging
 import os
-import sys
 import core
-from logging import DEBUG, INFO
 
 
 def _make_log_method(fn):
@@ -81,9 +78,13 @@ class LOG:
         # Enable logging in external modules
         cls.create_logger("").setLevel(cls.level)
 
+        # Disable LiteLLM INFO message in console
+        cls.create_logger("LiteLLM").setLevel(logging.CRITICAL)
+
     @classmethod
     def create_logger(cls, name):
         logger = logging.getLogger(name)
+
         logger.propagate = False
         logger.addHandler(cls.handler)
         return logger
