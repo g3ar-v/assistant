@@ -5,3 +5,6 @@ realtimesst.log
 peripherals.json
 experiments
 .vscode/
+dev.log
+.skills/
+user.json
