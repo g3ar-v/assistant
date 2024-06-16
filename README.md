@@ -16,7 +16,7 @@ The Assistant project is a sophisticated voice assistant application that levera
 
 ### Core
 
-- **OpenInterpreter** This is the brain of the system. Implemented [here](https://github.com/OpenInterpreter/open-interpreter.git).
+- **OpenInterpreter** This is the brain of the system. Implemented in this [codebase](https://github.com/OpenInterpreter/open-interpreter.git).
 - **Configuration Management:** Handles loading and storing configuration settings.
 - **Logging:** Provides logging utilities for debugging and monitoring.
 
@@ -32,7 +32,8 @@ The Assistant project is a sophisticated voice assistant application that levera
 - **Transcription:** Uses faster_whisper for converting audio to text.
 - **Callbacks:** Supports various callbacks for handling different states and events during recording and transcription.
 
-> [!important] The AudioToTextRecorder class and its functionalities in `audio_recorder.py` are implemented by [Kolja Beigel](https://github.com/KoljaB/RealtimeSTT.git). Just small modifications were made to support my requirements.
+> [!IMPORTANT]
+> The AudioToTextRecorder class and its functionalities in `audio_recorder.py` are implemented by [Kolja Beigel](https://github.com/KoljaB/RealtimeSTT.git). Just small modifications were made to support my requirements.
 
 ### Server
 

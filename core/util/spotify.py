@@ -24,7 +24,17 @@ def restore_playback_volume():
             "-e",
             (
                 'tell application "Spotify" to set sound volume to'
-                '(sound volume of application "Spotify") + 10'
+                '(sound volume of application "Spotify") + 15'
             ),
         ]
     )
+
+
+def pause_playback():
+    LOG.info("PAUSING SPOTIFY PLAYBACK")
+    subprocess.run(["osascript", "-e", 'tell application "Spotify" to pause'])
+
+
+def play_playback():
+    LOG.info("PLAYING SPOTIFY PLAYBACK")
+    subprocess.run(["osascript", "-e", 'tell application "Spotify" to play'])

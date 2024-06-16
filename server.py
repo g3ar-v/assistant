@@ -1,12 +1,10 @@
 # import time
 import asyncio
+from contextlib import asynccontextmanager
 
-import os
 import time
 import traceback
 
-import colorama
-from colorama import Fore, Style
 from fastapi import FastAPI, Request
 from pynput import keyboard
 from uvicorn import Config, Server
@@ -15,18 +13,31 @@ from core import Configuration, LOG
 from core.util.accumulator import Accumulator
 from core.util.audio_utils import find_input_device
 from core.util.beeps import beep, beeper
+from core.util.console_utils import print_markdown
 from core.util.process_utils import create_daemon
 
-# from core.util.log import LOG
-from core.util.spotify import reduce_playback_volume, restore_playback_volume
-from core.util.print_markdown import print_markdown
+from core.util.spotify import play_playback, pause_playback
 from intercept_notification import start_notification_observer
-from profiles.default import interpreter
+from profiles.mac_os import interpreter
 
 accumulator = Accumulator()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("")
+    print_markdown("○")
+    print_markdown("\n*Ready...*\n")
+    print(f"\nPress and hold {wake_key}, speak, then release.\n")
+    yield
+    LOG.info("Shutting down audio recorder...")
+    # recorder.shutdown()
+    print_markdown("*Server is shutting down*")
+    LOG.info("Shutting down assistant...")
+
+
 # Server
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 from_user = asyncio.Queue()
 HOST = "0.0.0.0"
 PORT = 8008
@@ -36,49 +47,7 @@ wake_key = keyboard.Key.f8
 # Button state
 is_pressed = False
 last_pressed = 0
-
-
-colorama.init()
-
-full_sentences = []
-displayed_text = ""
-
-
-def clear_console():
-    os.system("clear" if os.name == "posix" else "cls")
-
-
-def text_detected(text):
-    global displayed_text
-    sentences_with_style = [
-        f"{Fore.YELLOW + sentence + Style.RESET_ALL if i % 2 == 0 else Fore.CYAN + sentence + Style.RESET_ALL} "
-        for i, sentence in enumerate(full_sentences)
-    ]
-    new_text = (
-        "".join(sentences_with_style).strip() + " " + text
-        if len(sentences_with_style) > 0
-        else text
-    )
-
-    if new_text != displayed_text:
-        displayed_text = new_text
-        clear_console()
-        print(displayed_text, end="\n", flush=True)
-
-
-# @app.on_event("startup")
-# async def startup_event():
-#     # server_url = f"{HOST}:{PORT}"
-#     print("")
-#     print_markdown("○")
-#     print_markdown("\n*Starting...*\n")
-#     print("")
-
-
-# @app.on_event("shutdown")
-# async def shutdown_event():
-#     print_markdown("*Server is shutting down*")
-#     LOG.info("Shutting down...")
+playback_paused = False
 
 
 @app.post("/")
@@ -93,19 +62,27 @@ async def add_computer_message(request: Request):
     await from_user.put({"role": "user", "type": "message", "end": True})
 
 
+@app.post("/speak")
+async def speak(request: Request):
+    body = await request.json()
+    text = body.get("text")
+    if not text:
+        return {"error": "Missing 'text' in request body"}, 422
+    LOG.info(f"Speak: {text}")
+    stream.feed(text)
+    stream.play()
+
+
 def process_text(utterance):
-    # only STT returns str
-    # notification thread and websocket returns dict
     if isinstance(utterance, str):
         print(f"> {utterance}\n")
-    else:
-        print(f"> {utterance['content']}")
 
-    #     full_sentences.append(text)
-    #     text_detected("")
-
-    stream.feed(generator(utterance))
-    stream.play_async()
+    try:
+        stream.feed(generator(utterance))
+        stream.play_async()
+    except Exception:
+        stream.feed("For some reason I can't process that.")
+        stream.play_async()
 
 
 def generator(utterance):
@@ -146,17 +123,16 @@ def generator(utterance):
         #     raise
         except Exception:
             LOG.exception(traceback.format_exc())
-
-
-# stream.feed("Hi, how can I help you?")
-# stream.play_async()
+            raise
 
 
 def on_press(key):
-    global is_pressed, last_pressed
+    global is_pressed, last_pressed, playback_paused
     if key == wake_key and not is_pressed:
         beep("Morse")
-        reduce_playback_volume()
+        # reduce_playback_volume()
+        pause_playback()
+        playback_paused = True
         is_pressed = True
         last_pressed = time.time()
         recorder.start()
@@ -164,13 +140,20 @@ def on_press(key):
 
 
 def on_release(key):
-    global is_pressed, last_pressed
+    global is_pressed
 
     if key == wake_key and is_pressed:
         recorder.stop()
         is_pressed = False
         # beep("Frog")
         # restore_playback_volume()
+
+
+def on_speaking_end():
+    global playback_paused
+    if playback_paused:
+        play_playback()
+        playback_paused = False
 
 
 def push_to_talk_listener():
@@ -186,6 +169,7 @@ def speech_listener(recorder):
     LOG.info("Starting speech listener...")
     while True:
         recorder.text(process_text)
+        time.sleep(2)
 
 
 async def websocket_listener():
@@ -194,13 +178,10 @@ async def websocket_listener():
         if not from_user.empty():
             LOG.info("Message gotten from websocket...")
             chunk = await from_user.get()
-            # break
         else:
             await asyncio.sleep(1)
             continue
-        # await asyncio.sleep(0.1)
 
-        # chunk = ""
         message = accumulator.accumulate(chunk)
 
         if message is None:
@@ -221,15 +202,16 @@ async def main():
     asyncio.create_task(websocket_listener())
     create_daemon(target=speech_listener, args=(recorder,))
 
-    config = Config(app=app, host=HOST, port=PORT, lifespan="on", log_level="info")
+    config = Config(app=app, host=HOST, port=PORT, log_level="critical")
     server = Server(config)
-    print(f"\nPress and hold {wake_key}, speak, then release.\n")
     await server.serve()
 
 
 if __name__ == "__main__":
-    from RealtimeSTT import AudioToTextRecorder
-    from RealtimeTTS import OpenAIEngine, TextToAudioStream
+    # from RealtimeSTT import AudioToTextRecorder
+
+    from audio_recorder import AudioToTextRecorder
+    from RealtimeTTS import OpenAIEngine, ElevenlabsEngine, TextToAudioStream
 
     LOG.info("\n")
     LOG.info("Starting assistant program...")
@@ -250,32 +232,37 @@ if __name__ == "__main__":
         # LOG.info("Wake word detected")
         beep("Morse")
         stream.stop()
-        reduce_playback_volume()
+        # reduce_playback_volume()
+        pause_playback()
+
+    def on_transcription_start():
+        LOG.info("audio recording is transcribing...")
 
     def on_recording_stop():
         beep("Frog")
-        restore_playback_volume()
 
     def on_wakeword_timeout():
+        LOG.info("STOPPED RECORDING DUE TO TIMEOUT")
         recorder.stop()
 
-    device_index = find_input_device(device_name)
+    # device_index = find_input_device(device_name)
     recorder_config = {
         "wake_words": LISTENER_CONFIG.get("wake_word"),
         "model": LISTENER_CONFIG.get("stt").get("whisper").get("model"),
         "language": "en",
-        "input_device_index": device_index,
-        "porcupine_access_token": config.get("microservices").get("porcupine_api_key"),
+        # "input_device_index": device_index,
         "spinner": False,
+        "porcupine_access_token": config.get("microservices").get("porcupine_api_key"),
         "on_wakeword_detected": on_wakeword_detected,
-        "pre_recording_buffer_duration": 1,
+        "pre_recording_buffer_duration": 3,
         "on_recording_stop": on_recording_stop,
         "on_wakeword_timeout": on_wakeword_timeout,
+        "on_transcription_start": on_transcription_start,
+        "wake_word_timeout": 1.5,
         # "silero_sensitivity": 0.4,
         # "webrtc_sensitivity": 2,
-        "level": 20,
         # "post_speech_silence_duration": 1.0,
-        # "min_length_of_recording": 0,
+        "min_length_of_recording": 0,
         # "min_gap_between_recordings": 0,
         # "enable_realtime_transcription": True,
         # "realtime_processing_pause": 0.2,
@@ -283,9 +270,51 @@ if __name__ == "__main__":
         # "on_realtime_transcription_update": text_detected,
     }
     recorder = AudioToTextRecorder(**recorder_config)
-    # recorder = None
 
-    stream = TextToAudioStream(OpenAIEngine())
+    engine = None
+    TTS_CONFIG = config.get("tts")
+    if TTS_CONFIG.get("module") == "elevenlabs":
+        voice = TTS_CONFIG.get("elevenlabs").get("voice")
+        engine = ElevenlabsEngine(
+            api_key=TTS_CONFIG.get("elevenlabs").get("api_key"),
+            voice=voice,
+            stability=TTS_CONFIG.get("elevenlabs").get(voice).get("stability"),
+            clarity=TTS_CONFIG.get("elevenlabs").get(voice).get("clarity"),
+        )
+    LOG.info(f"Accessing TTS_CONFIG module: {TTS_CONFIG.get('module')}")
+    if TTS_CONFIG.get("module") == "elevenlabs":
+        LOG.info(
+            f"Accessing elevenlabs voice: {TTS_CONFIG.get('elevenlabs').get('voice')}"
+        )
+        voice = TTS_CONFIG.get("elevenlabs").get("voice")
+        LOG.info(
+            f"Accessing elevenlabs api_key: {TTS_CONFIG.get('elevenlabs').get('api_key')}"
+        )
+        LOG.info(
+            f"Accessing elevenlabs stability: {TTS_CONFIG.get('elevenlabs').get(voice).get('stability')}"
+        )
+        LOG.info(
+            f"Accessing elevenlabs clarity: {TTS_CONFIG.get('elevenlabs').get(voice).get('similarity_boost')}"
+        )
+        engine = ElevenlabsEngine(
+            api_key=TTS_CONFIG.get("elevenlabs").get("api_key"),
+            voice=voice,
+            id=TTS_CONFIG.get("elevenlabs").get(voice).get("id"),
+            stability=TTS_CONFIG.get("elevenlabs").get(voice).get("stability"),
+            clarity=TTS_CONFIG.get("elevenlabs").get(voice).get("similarity_boost"),
+        )
+    elif TTS_CONFIG.get("module") == "openai":
+        LOG.info(f"Accessing openai model: {TTS_CONFIG.get('openai').get('model')}")
+        LOG.info(f"Accessing openai voice: {TTS_CONFIG.get('openai').get('voice')}")
+        engine = OpenAIEngine(
+            model=TTS_CONFIG.get("openai").get("model"),
+            voice=TTS_CONFIG.get("openai").get("voice"),
+        )
+
+    stream = TextToAudioStream(engine=engine, on_audio_stream_stop=on_speaking_end)
     loop = asyncio.get_event_loop()
     asyncio.set_event_loop(loop)
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        LOG.info("Shutting down...")
