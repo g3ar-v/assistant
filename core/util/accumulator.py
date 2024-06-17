@@ -1,3 +1,6 @@
+from core import LOG
+
+
 class Accumulator:
     def __init__(self):
         self.template = {"role": None, "type": None, "format": None, "content": None}
@@ -11,7 +14,7 @@ class Accumulator:
                 return None
 
             if "start" in chunk:
-                self.message = chunk
+                self.message = {**self.template, **chunk}
                 self.message.pop("start")
                 return None
 
@@ -21,7 +24,7 @@ class Accumulator:
                     for key in self.message
                     if key != "content"
                 ):
-                    self.message = chunk
+                    self.message = {**self.message, **chunk}
                 if "content" not in self.message:
                     self.message["content"] = chunk["content"]
                 else:
