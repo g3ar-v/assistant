@@ -10,8 +10,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.11, <3.12"
 realtimestt = { path = "../RealtimeSTT", develop = true }
-# realtimestt = "^0.1.12"
-realtimetts = "^0.3.44"
+realtimetts = { path = "../RealtimeTTS", develop = true }
 fasteners = "^0.19"
 pyxdg = "^0.28"
 # open-interpreter = "^0.2.5"
@@ -22,6 +21,7 @@ apsw = "^3.46.0.0"
 watchdog = "^4.0.1"
 pathlib = "^1.0.1"
 rich = "^13.7.1"
+pyee = "11.1.0"
 
 
 [build-system]

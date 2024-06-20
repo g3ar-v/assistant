@@ -8,3 +8,4 @@ experiments
 dev.log
 .skills/
 user.json
+.DS_Store
