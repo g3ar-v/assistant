@@ -63,7 +63,7 @@ class DBEventHandler(FileSystemEventHandler):
             self.rec_ids.append(obj[0])
 
             # run script for each new notification if in allowed apps
-            LOG.info(f"applications: {obj[1]['app']}")
+            LOG.debug(f"applications: {obj[1]['app']}")
             if obj[1]["app"] in self.allowed_apps:
                 LOG.info(f"{obj[1]['app']} is in allowed apps")
                 LOG.info("running script...")
@@ -80,9 +80,9 @@ class DBEventHandler(FileSystemEventHandler):
                     ],
                     capture_output=True,
                 )
-                LOG.info(f"{obj[1]}")
-                LOG.info(f"stdout: {result.stdout}")
-                LOG.info(f"stderr: {result.stderr}")
+                LOG.info(f"Notification info: {obj[1]}")
+                LOG.debug(f"stdout: {result.stdout}")
+                LOG.debug(f"stderr: {result.stderr}")
 
 
 # process data plist from notification center db
@@ -134,9 +134,6 @@ def start_notification_observer():
 
     # path to script the user wants to run on a notification being sent
     hook_script_path = os.path.join(os.getcwd(), "nchook_script")
-    # hook_script_path = os.path.join(
-    #     pathlib.Path.home(), ".config", "nchook", "nchook_script"
-    # )
 
     event_handler = DBEventHandler(db, rec_ids, hook_script_path)
 
@@ -149,16 +146,7 @@ def start_notification_observer():
     LOG.info("Starting notification observer...")
     observer.start()
 
-    # observer_thread = create_daemon(target=observer.join())
-    # print("started notification observer")
-    # return observer_thread, observer
     return observer
-    # try:
-    #     observer.join()
-    # finally:
-    #     observer.stop()
-    #     observer.join()
-    # return observer
 
 
 if __name__ == "__main__":
@@ -166,9 +154,3 @@ if __name__ == "__main__":
     print("not joined yet")
     observer_thread.join()
     print("just joined")
-    # observer.start()
-    # try:
-    #     observer.join()
-    # finally:
-    #     observer.stop()
-    #     observer.join()

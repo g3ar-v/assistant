@@ -17,7 +17,7 @@ def get_kernel_messages():
     Is this the way to do this?
     """
     current_platform = platform.system()
-    command = ["log", "show", "--style", "syslog", "--last", "1m"]
+    command = ["log", "show", "--last", "1m", "--info"]
 
     if current_platform == "Darwin":
         process = subprocess.Popen(
@@ -66,6 +66,9 @@ def get_dmesg_log_path():
 
 def custom_filter(message):
     # Check for {TO_INTERPRETER{ message here }TO_INTERPRETER} pattern
+    filter_wake_message = "powerd: [com.apple.powerd:sleepWake]"
+    filtered_wake_message1 = "Wake from Deep Idle [CDNVA]"
+
     if "{TO_INTERPRETER{" in message and "}TO_INTERPRETER}" in message:
         start = message.find("{TO_INTERPRETER{") + len("{TO_INTERPRETER{")
         end = message.find("}TO_INTERPRETER}", start)
@@ -77,12 +80,8 @@ def custom_filter(message):
     # elif any(keyword in message for keyword in ['network', 'IP', 'internet', 'LAN', 'WAN', 'router', 'switch']) and "networkStatusForFlags" not in message:
 
     #     return message
-    elif "<SMC.OutboxNotEmpty smc.70070000 lid>" in message:
-        start = message.find("systemWokenByWiFi:")
-        end = message.find(">,") + 1
-
-        # return message[11:26] + message[start:end]
-        return message[start:end]
+    elif filter_wake_message in message and filtered_wake_message1 in message:
+        return message
     else:
         return None
 
@@ -106,16 +105,17 @@ def check_filtered_kernel():
     for message in messages:
         if custom_filter(message):
             LOG.debug(f"Kernel message: {message}")
-            if "<SMC.OutboxNotEmpty smc.70070000 lid>" in message and any(
-                "systemWokenByWiFi: System wake reason: <SMC.OutboxNotEmpty smc.70070000 lid>"
-                in filtered_message
-                for filtered_message in filtered_messages
-            ):
-                last_messages = filtered_messages[-1] if filtered_messages else ""
-                continue
+            # if "<SMC.OutboxNotEmpty smc.70070000 lid>" in message and any(
+            #     "systemWokenByWiFi: System wake reason: <SMC.OutboxNotEmpty smc.70070000 lid>"
+            #     in filtered_message
+            #     for filtered_message in filtered_messages
+            # ):
+            #     last_messages = filtered_messages[-1] if filtered_messages else ""
+            #     LOG.info("Duplicate message found. Skipping.")
+            #     continue
             filtered_messages.append(custom_filter(message))
-            # LOG.info(f"Filtered kernel message: {filtered_messages}")
-    last_messages = filtered_messages[-1] if filtered_messages else ""
+            LOG.debug(f"Filtered kernel message: {filtered_messages}")
+    last_messages = "\n".join(filtered_messages)
     LOG.debug(f"last_messages: {last_messages}")
     return "\n".join(filtered_messages)
 
@@ -124,20 +124,12 @@ def check_filtered_kernel():
 async def put_kernel_messages_into_queue(queue):
     # clear unique message everytime last message is equal to "",
     LOG.info("Starting kernel listener...")
-    seen = set()
+    # seen = set()
 
     while True:
         text = check_filtered_kernel()
 
         if text:
-            if text in seen:
-                asyncio.sleep(2)
-                LOG.info("message already seen, skipping")
-                continue
-            else:
-                LOG.debug("adding unique message")
-                seen.add(text)
-
             LOG.debug(f"putting kernel messages into queue: {text}")
             if isinstance(queue, asyncio.Queue):
                 await queue.put({"role": "computer", "type": "console", "start": True})
@@ -162,8 +154,6 @@ async def put_kernel_messages_into_queue(queue):
                 )
                 queue.put({"role": "computer", "type": "console", "end": True})
             await asyncio.sleep(70)
+            continue
 
-        else:
-            LOG.debug("resetting seen messages")
-            seen = set()
-            await asyncio.sleep(3)
+        await asyncio.sleep(6)
