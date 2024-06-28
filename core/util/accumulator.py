@@ -24,7 +24,7 @@ class Accumulator:
                     for key in self.message
                     if key != "content"
                 ):
-                    self.message = {**self.message, **chunk}
+                    self.message = chunk
                 if "content" not in self.message:
                     self.message["content"] = chunk["content"]
                 else:
